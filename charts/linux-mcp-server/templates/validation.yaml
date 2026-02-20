@@ -1,63 +1,10 @@
-{{- if and .Values.ingress.enabled .Values.gatewayApi.enabled -}}
-{{- fail "ingress.enabled and gatewayApi.enabled are mutually exclusive. Set only one to true." -}}
-{{- end -}}
-
-{{- if lt (int .Values.replicaCount) 1 -}}
-{{- fail "replicaCount must be >= 1." -}}
-{{- end -}}
-
-{{- if eq .Values.service.type "ExternalName" -}}
-{{- fail "service.type=ExternalName is not supported by this chart. Use ClusterIP, NodePort, or LoadBalancer." -}}
-{{- end -}}
-
-{{- if eq .Values.linuxMcp.transport "stdio" -}}
-{{- fail "linuxMcp.transport=stdio is not supported for Kubernetes deployments. Use http or streamable-http." -}}
-{{- end -}}
-
-{{- if and .Values.ingress.enabled (eq (len .Values.ingress.hosts) 0) -}}
-{{- fail "ingress.hosts must contain at least one item when ingress.enabled=true." -}}
-{{- end -}}
-
-{{- range $idx, $mount := .Values.extraVolumeMounts -}}
-{{- if not $mount.name -}}
-{{- fail (printf "extraVolumeMounts[%d].name is required." $idx) -}}
-{{- end -}}
-{{- if not $mount.mountPath -}}
-{{- fail (printf "extraVolumeMounts[%d].mountPath is required." $idx) -}}
-{{- end -}}
-{{- end -}}
-
+{{/*
+Template-time validation for constraints that are not expressible in values.schema.json.
+*/}}
 {{- if .Values.sshSecret.enabled -}}
 {{- range $idx, $volume := .Values.extraVolumes -}}
 {{- if eq $volume.name "ssh-secret" -}}
 {{- fail (printf "extraVolumes[%d].name cannot be 'ssh-secret' when sshSecret.enabled=true." $idx) -}}
 {{- end -}}
-{{- end -}}
-{{- end -}}
-
-{{- if .Values.gatewayApi.enabled -}}
-{{- if eq (len .Values.gatewayApi.parentRefs) 0 -}}
-{{- fail "gatewayApi.parentRefs must contain at least one item when gatewayApi.enabled=true." -}}
-{{- end -}}
-{{- if eq (len .Values.gatewayApi.rules) 0 -}}
-{{- fail "gatewayApi.rules must contain at least one item when gatewayApi.enabled=true." -}}
-{{- end -}}
-{{- $firstParent := index .Values.gatewayApi.parentRefs 0 -}}
-{{- if not $firstParent.name -}}
-{{- fail "gatewayApi.parentRefs[0].name is required when gatewayApi.enabled=true." -}}
-{{- end -}}
-{{- end -}}
-
-{{- if and .Values.pdb (not (kindIs "map" .Values.pdb)) -}}
-{{- fail "pdb must be a map." -}}
-{{- end -}}
-
-{{- if and (kindIs "map" .Values.pdb) (hasKey .Values.pdb "minAvailable") (ne .Values.pdb.minAvailable nil) -}}
-{{- $rawPdbMin := .Values.pdb.minAvailable -}}
-{{- if and (kindIs "string" $rawPdbMin) (not (regexMatch "^[0-9]+$" $rawPdbMin)) -}}
-{{- fail "pdb.minAvailable must be a non-negative integer." -}}
-{{- end -}}
-{{- if lt (int $rawPdbMin) 0 -}}
-{{- fail "pdb.minAvailable must be >= 0." -}}
 {{- end -}}
 {{- end -}}
