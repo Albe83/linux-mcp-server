@@ -8,6 +8,7 @@ Get the Linux MCP Server running quickly with your favorite LLM client.
 **Table of Contents**
 
 - [Installation Options](#installation-options)
+- [Deploy with Helm (Kubernetes)](#deploy-with-helm-kubernetes)
 - [SSH Configuration](#ssh-configuration)
 - [Platform Specific Notes](#platform-specific-notes)
 
@@ -15,7 +16,8 @@ Get the Linux MCP Server running quickly with your favorite LLM client.
 
 ## Installation Options
 
-The Linux MCP Server can be installed using `pip`, `uv`, or run in a container. Choose the method that best suits your environment.
+The Linux MCP Server can be installed using `pip`, `uv`, run in a container, or deployed with Helm on Kubernetes.
+Choose the method that best suits your environment.
 
 ### Prerequisites
 
@@ -152,6 +154,160 @@ sudo chown -R 1001:1001 ~/.local/share/linux-mcp-server/
 
 
 Once the SSH keys are configured, configure your [LLM client](clients.md) to run the container image. It is not necessary to run the container manually since the LLM client will do that.
+
+---
+
+## Deploy with Helm (Kubernetes)
+
+The repository includes a Helm chart at `charts/linux-mcp-server` for Kubernetes deployments.
+
+### Prerequisites
+
+- Kubernetes cluster access
+- Helm 3.x
+- Existing SSH secret (recommended for remote host diagnostics)
+
+### Create namespace and SSH secret
+
+```bash
+kubectl create namespace linux-mcp-server
+kubectl -n linux-mcp-server create secret generic linux-mcp-server-ssh \
+  --from-file=id_ed25519="$HOME/.ssh/id_ed25519" \
+  --from-file=config="$HOME/.ssh/config"
+```
+
+### Install chart
+
+```bash
+helm install linux-mcp-server ./charts/linux-mcp-server -n linux-mcp-server
+```
+
+### Upgrade chart
+
+```bash
+helm upgrade linux-mcp-server ./charts/linux-mcp-server -n linux-mcp-server
+```
+
+### Validate deployment and access endpoint
+
+```bash
+kubectl -n linux-mcp-server get pods,svc
+kubectl -n linux-mcp-server port-forward svc/linux-mcp-server 8000:8000
+```
+
+MCP endpoint (default):
+
+```text
+http://127.0.0.1:8000/mcp
+```
+
+### Common value overrides
+
+- Disable SSH secret mount (local-only diagnostics inside pod):
+  `--set sshSecret.enabled=false`
+- Change image tag:
+  `--set image.tag=<tag>`
+- Change service type:
+  `--set service.type=NodePort`
+- Change transport:
+  `--set linuxMcp.transport=http`
+- Add direct environment variable:
+  `--set extraEnv[0].name=HTTP_PROXY --set extraEnv[0].value=http://proxy.internal:8080`
+- Import environment variables from secret:
+  `--set extraEnvFrom[0].secretRef.name=linux-mcp-extra-env`
+- Override PodDisruptionBudget minAvailable (non-negative integer):
+  `--set pdb.minAvailable=1`
+
+By default, the chart always creates a PodDisruptionBudget and computes `minAvailable` automatically:
+`0` when `replicaCount<=1`, otherwise `1`.
+
+For Kubernetes Helm deployments, supported values are:
+- `service.type`: `ClusterIP`, `NodePort`, `LoadBalancer`
+- `linuxMcp.transport`: `http`, `streamable-http`
+
+### Extra environment variables and volumes
+
+Use a values file for complex `extraEnv`, `extraEnvFrom`, `extraVolumes`, and `extraVolumeMounts` configuration:
+
+```yaml
+linuxMcp:
+  extraEnv:
+    LOG_FORMAT: json
+
+extraEnv:
+  - name: HTTP_PROXY
+    value: http://proxy.internal:8080
+  - name: API_TOKEN
+    valueFrom:
+      secretKeyRef:
+        name: linux-mcp-extra-env
+        key: api-token
+
+extraEnvFrom:
+  - configMapRef:
+      name: linux-mcp-runtime-env
+  - secretRef:
+      name: linux-mcp-extra-env
+
+extraVolumes:
+  - name: extra-data
+    persistentVolumeClaim:
+      claimName: linux-mcp-data
+
+extraVolumeMounts:
+  - name: extra-data
+    mountPath: /var/lib/mcp/data
+```
+
+Apply:
+
+```bash
+helm upgrade --install linux-mcp-server ./charts/linux-mcp-server -n linux-mcp-server -f my-values.yaml
+```
+
+When `sshSecret.enabled=true`, avoid defining an `extraVolumes` entry with name `ssh-secret`.
+
+### Optional Ingress
+
+Enable Ingress and configure host/path routing:
+
+```bash
+helm upgrade --install linux-mcp-server ./charts/linux-mcp-server -n linux-mcp-server \
+  --set ingress.enabled=true \
+  --set ingress.className=nginx \
+  --set ingress.hosts[0].host=linux-mcp.example.com \
+  --set ingress.hosts[0].paths[0].path=/mcp \
+  --set ingress.hosts[0].paths[0].pathType=Prefix
+```
+
+Enable TLS on Ingress:
+
+```bash
+helm upgrade --install linux-mcp-server ./charts/linux-mcp-server -n linux-mcp-server \
+  --set ingress.enabled=true \
+  --set ingress.className=nginx \
+  --set ingress.hosts[0].host=linux-mcp.example.com \
+  --set ingress.tls[0].secretName=linux-mcp-tls \
+  --set ingress.tls[0].hosts[0]=linux-mcp.example.com
+```
+
+### Optional Gateway API (HTTPRoute)
+
+Gateway API requires CRDs installed in the cluster and a pre-existing Gateway resource.
+
+```bash
+helm upgrade --install linux-mcp-server ./charts/linux-mcp-server -n linux-mcp-server \
+  --set gatewayApi.enabled=true \
+  --set gatewayApi.parentRefs[0].name=shared-gateway \
+  --set gatewayApi.parentRefs[0].namespace=infra \
+  --set gatewayApi.hostnames[0]=linux-mcp.example.com
+```
+
+If `gatewayApi.hostnames` is empty, the chart omits `spec.hostnames` from HTTPRoute (no hostname filtering).
+
+`ingress.enabled` and `gatewayApi.enabled` are mutually exclusive. Set only one to `true`.
+When `ingress.enabled=true`, `ingress.hosts` must contain at least one entry.
+When `gatewayApi.enabled=true`, both `gatewayApi.parentRefs` and `gatewayApi.rules` must contain at least one entry.
 
 ---
 
@@ -513,4 +669,3 @@ See the [Troubleshooting Guide](troubleshooting.md) for solutions to common issu
 - **[Contributing](contributing.md):** Development workflow and guidelines
 - **[MCP Documentation](https://modelcontextprotocol.io/)**
 - **[MCP Inspector](https://github.com/modelcontextprotocol/inspector)**
-

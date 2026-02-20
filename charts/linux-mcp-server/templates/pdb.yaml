@@ -1,0 +1,15 @@
+{{- $minAvailable := ternary 0 1 (le (int .Values.replicaCount) 1) -}}
+{{- if and (kindIs "map" .Values.pdb) (hasKey .Values.pdb "minAvailable") (ne .Values.pdb.minAvailable nil) -}}
+{{- $minAvailable = int .Values.pdb.minAvailable -}}
+{{- end -}}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "linux-mcp-server.fullname" . }}
+  labels:
+    {{- include "linux-mcp-server.labels" . | nindent 4 }}
+spec:
+  minAvailable: {{ $minAvailable }}
+  selector:
+    matchLabels:
+      {{- include "linux-mcp-server.selectorLabels" . | nindent 6 }}

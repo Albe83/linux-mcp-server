@@ -1,4 +1,4 @@
-.PHONY: help sync lint format types test ci verify fix clean docs docs-serve zipapp
+.PHONY: help sync lint format types test ci verify fix clean docs docs-serve zipapp helm-lint helm-template-check
 
 # Default target
 help:
@@ -14,6 +14,8 @@ help:
 	@echo "  make sync     - Install/sync all dependencies"
 	@echo "  make fix      - Auto-fix lint and format issues"
 	@echo "  make clean    - Remove build artifacts and caches"
+	@echo "  make helm-lint - Lint Helm chart"
+	@echo "  make helm-template-check - Render Helm chart templates"
 	@echo ""
 	@echo "📦 Build Targets:"
 	@echo "  make zipapp   - Build a zipapp using shiv"
@@ -63,3 +65,9 @@ docs:
 
 docs-serve:
 	uv run --locked --group docs mkdocs serve --dev-addr localhost:8010 --livereload
+
+helm-lint:
+	helm lint charts/linux-mcp-server
+
+helm-template-check:
+	helm template linux-mcp-server charts/linux-mcp-server >/dev/null

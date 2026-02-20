@@ -1,0 +1,110 @@
+nameOverride: ""
+fullnameOverride: ""
+
+replicaCount: 1
+
+image:
+  repository: quay.io/redhat-services-prod/rhel-lightspeed-tenant/linux-mcp-server
+  tag: latest
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+serviceAccount:
+  create: true
+  automountServiceAccountToken: false
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+
+securityContext:
+  runAsUser: 1001
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false
+
+service:
+  # Service listening port (clients connect here).
+  type: ClusterIP
+  port: 8000
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: linux-mcp-server.local
+      paths:
+        - path: /mcp
+          pathType: Prefix
+  tls: []
+
+gatewayApi:
+  enabled: false
+  annotations: {}
+  parentRefs:
+    - name: ""
+      namespace: ""
+      sectionName: ""
+  hostnames:
+    - linux-mcp-server.local
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /mcp
+  filters: []
+
+pdb:
+  # Override PodDisruptionBudget minAvailable. If null, the chart computes:
+  # 0 when replicaCount <= 1, otherwise 1.
+  minAvailable: null
+
+resources: {}
+
+nodeSelector: {}
+
+affinity: {}
+
+tolerations: []
+
+extraEnv: []
+
+extraEnvFrom: []
+
+extraVolumes: []
+
+extraVolumeMounts: []
+
+linuxMcp:
+  # Application listening port inside the container.
+  transport: streamable-http
+  host: 0.0.0.0
+  port: 8000
+  path: /mcp
+  searchForSshKey: true
+  logLevel: INFO
+  logDir: /tmp/linux-mcp-server/logs
+  # Additional environment variables injected into the dedicated ConfigMap.
+  extraEnv: {}
+
+sshSecret:
+  enabled: true
+  name: linux-mcp-server-ssh
+  mountPath: /var/lib/mcp/.ssh
+
+probes:
+  readiness:
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 1
+    failureThreshold: 3
+  liveness:
+    initialDelaySeconds: 15
+    periodSeconds: 20
+    timeoutSeconds: 1
+    failureThreshold: 3
