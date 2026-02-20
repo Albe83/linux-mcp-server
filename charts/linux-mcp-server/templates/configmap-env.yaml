@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "linux-mcp-server.envConfigMapName" . }}
+  labels:
+    {{- include "linux-mcp-server.labels" . | nindent 4 }}
+data:
+  LINUX_MCP_TRANSPORT: {{ .Values.linuxMcp.transport | quote }}
+  LINUX_MCP_HOST: {{ .Values.linuxMcp.host | quote }}
+  LINUX_MCP_PORT: {{ .Values.linuxMcp.port | quote }}
+  LINUX_MCP_PATH: {{ .Values.linuxMcp.path | quote }}
+  LINUX_MCP_SEARCH_FOR_SSH_KEY: {{ ternary "True" "False" .Values.linuxMcp.searchForSshKey | quote }}
+  LINUX_MCP_LOG_LEVEL: {{ .Values.linuxMcp.logLevel | quote }}
+  LINUX_MCP_LOG_DIR: {{ .Values.linuxMcp.logDir | quote }}
+  {{- range $name, $value := .Values.linuxMcp.extraEnv }}
+  {{ $name }}: {{ $value | quote }}
+  {{- end }}

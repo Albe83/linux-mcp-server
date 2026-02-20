@@ -1,0 +1,10 @@
+{{/*
+Template-time validation for constraints that are not expressible in values.schema.json.
+*/}}
+{{- if .Values.sshSecret.enabled -}}
+{{- range $idx, $volume := .Values.extraVolumes -}}
+{{- if eq $volume.name "ssh-secret" -}}
+{{- fail (printf "extraVolumes[%d].name cannot be 'ssh-secret' when sshSecret.enabled=true." $idx) -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
